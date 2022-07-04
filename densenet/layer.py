@@ -1,7 +1,4 @@
-from turtle import forward
 from torch import Tensor, nn, cat
-
-F = nn.functional
 
 
 class GlobalPool2d(nn.Module):
