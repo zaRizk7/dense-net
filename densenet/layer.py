@@ -1,5 +1,3 @@
-from inspect import Traceback
-from multiprocessing import Pool
 from torch import Tensor, nn, cat
 from typing import Tuple
 
@@ -37,16 +35,22 @@ class Dense(nn.Module):
         return inputs
 
 
+def calculate_padding(kernel_size: int):
+    padding = 0
+    if kernel_size % 2 != 0:
+        while 2 * padding + 1 < kernel_size:
+            padding += 1
+    return padding
+
+
 def Conv(
     in_channels: int, out_channels: int, kernel_size: int, stride: int = 1
 ) -> nn.Sequential:
-    if kernel_size % 2 == 0:
-        raise ValueError("kernel_size must be an odd number!")
-    padding = 0 if kernel_size > 1 else kernel_size - 2
+    padding = calculate_padding(kernel_size)
     return nn.Sequential(
         nn.BatchNorm2d(in_channels),
         nn.ReLU(),
-        nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding),
+        nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=False),
     )
 
 
@@ -60,10 +64,11 @@ def Bottleneck(
 
 
 def Pool2d(pool: str, kernel_size: int, stride: int) -> nn.Module:
+    padding = calculate_padding(kernel_size)
     if pool == "max":
-        return nn.MaxPool2d(kernel_size, stride)
+        return nn.MaxPool2d(kernel_size, stride, padding)
     elif pool == "avg":
-        return nn.AvgPool2d(kernel_size, stride)
+        return nn.AvgPool2d(kernel_size, stride, padding)
     raise ValueError("pool must either be 'max' or 'avg'")
 
 
@@ -86,6 +91,20 @@ if __name__ == "__main__":
     from torch import rand, no_grad
 
     with no_grad():
-        x = rand(32, 64, 224, 224)
-        dense = Dense(64, 32, 6)
-        print(dense(x).shape)
+        x = rand(32, 3, 224, 224)
+
+        # DenseNet-121
+        model = nn.Sequential(
+            Transition(3, 64, 7, 3, 2, 2),
+            Dense(64, 32, 6),
+            Transition(256, 128, 1, 2, 1, 2, "avg"),
+            Dense(128, 32, 12),
+            Transition(512, 256, 1, 2, 1, 2, "avg"),
+            Dense(256, 32, 24),
+            Transition(1024, 512, 1, 2, 1, 2, "avg"),
+            Dense(512, 32, 16),
+            GlobalPool2d("avg"),
+            nn.Linear(1024, 1000),
+        )
+        print(model(x).shape)
+        print(f"{sum(p.numel() for p in model.parameters()):,}")
