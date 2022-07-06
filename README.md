@@ -1,4 +1,4 @@
-# dense-net
+# DenseNet from Scratch
 My implementation for DenseNet in PyTorch.
 
 - Reference: Densely Connected Convolutional Networks (CVPR 2017)
