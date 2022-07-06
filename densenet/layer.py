@@ -18,15 +18,13 @@ class GlobalPool2d(nn.Module):
 
 
 class Dense(nn.Module):
-    def __init__(
-        self, in_channels, out_channels, num_layers, kernel_size=(1, 3)
-    ) -> None:
+    def __init__(self, in_channels, k_channels, num_layers, kernel_size=(1, 3)) -> None:
         super().__init__()
         self.convs = nn.ModuleList()
         for l in range(num_layers):
-            self.convs.append(
-                Bottleneck(in_channels + out_channels * l, out_channels, kernel_size)
-            )
+            self.convs += [
+                Bottleneck(in_channels + k_channels * l, k_channels, kernel_size)
+            ]
 
     def forward(self, inputs):
         for conv in self.convs:
@@ -49,7 +47,7 @@ def Conv(
     padding = calculate_padding(kernel_size)
     return nn.Sequential(
         nn.BatchNorm2d(in_channels),
-        nn.ReLU(),
+        nn.ReLU(inplace=True),
         nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=False),
     )
 
@@ -75,10 +73,10 @@ def Pool2d(pool: str, kernel_size: int, stride: int) -> nn.Module:
 def Transition(
     in_channels: int,
     out_channels: int,
-    kernel_size_conv: int,
-    kernel_size_pool: int,
+    kernel_size_conv: int = 1,
+    kernel_size_pool: int = 2,
     stride_conv: int = 1,
-    stride_pool: int = 1,
+    stride_pool: int = 2,
     pool: str = "max",
 ) -> nn.Sequential:
     return nn.Sequential(
@@ -97,13 +95,13 @@ if __name__ == "__main__":
         model = nn.Sequential(
             Transition(3, 64, 7, 3, 2, 2),
             Dense(64, 32, 6),
-            Transition(256, 128, 1, 2, 1, 2, "avg"),
+            Transition(256, 128, pool="avg"),
             Dense(128, 32, 12),
-            Transition(512, 256, 1, 2, 1, 2, "avg"),
+            Transition(512, 256, pool="avg"),
             Dense(256, 32, 24),
-            Transition(1024, 512, 1, 2, 1, 2, "avg"),
+            Transition(1024, 512, pool="avg"),
             Dense(512, 32, 16),
-            GlobalPool2d("avg"),
+            GlobalPool2d(pool="avg"),
             nn.Linear(1024, 1000),
         )
         print(model(x).shape)
